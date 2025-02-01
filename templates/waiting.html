@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Waiting Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f5f5f5; padding: 20px; }
+        h1 { color: #333; }
+        #timer { font-size: 24px; font-weight: bold; color: red; }
+        button {
+            padding: 15px 30px; font-size: 18px; margin-top: 20px; cursor: pointer;
+            background: blue; color: white; border: none;
+        }
+        button:disabled { background: gray; cursor: not-allowed; }
+        /* Professional Instructions styling */
+        #instructions {
+            margin: 20px auto; 
+            padding: 15px; 
+            border: 1px solid #ccc; 
+            background: #fff;
+            font-family: Arial, sans-serif; 
+            font-size: 14px; 
+            line-height: 1.5; 
+            text-align: left;
+            max-width: 600px;
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const startTimestamp = {{ test.start_time }}; // ✅ Correct Jinja formatting
+
+            function updateCountdown() {
+                const now = Math.floor(Date.now() / 1000);
+                const remaining = startTimestamp - now;
+                const timerElement = document.getElementById("timer");
+                const startButton = document.getElementById("startBtn");
+
+                if (remaining <= 0) {
+                    timerElement.innerText = "Test is ready! Click Start.";
+                    startButton.disabled = false; // ✅ Enable button
+                } else {
+                    const mins = Math.floor(remaining / 60);
+                    const secs = remaining % 60;
+                    timerElement.innerText = `Waiting: ${mins}m ${secs}s`;
+                    setTimeout(updateCountdown, 1000);
+                }
+            }
+
+            document.getElementById("startBtn").addEventListener("click", function () {
+                const now = Math.floor(Date.now() / 1000);
+                if (now >= startTimestamp) {
+                    window.location.href = `/test/{{ test_id }}`; // ✅ Redirect to actual test page
+                } else {
+                    alert("Test is not ready yet!");
+                }
+            });
+
+            updateCountdown();
+        });
+    </script>
+</head>
+<body>
+    <h1>Test Waiting Page</h1>
+    
+    <!-- Professional Instructions Section -->
+    <div id="instructions">
+        <p><strong>Instructions:</strong></p>
+        <p>
+            1. You are on the waiting page. Your exam will commence as soon as you click the “Start Test” button.
+        </p>
+        <p>
+            2. Ensure that you are properly seated in an environment with minimal background noise. Adjust your camera so your face, hands, and any writing materials are clearly visible. After clicking “Start Test,” you will be redirected to the exam page where you'll be prompted to grant access to your camera, microphone, and other necessary functions. Please accept all permission requests.
+        </p>
+        <p>
+            3. Upon granting the necessary permissions, your exam questions will be displayed and the countdown timer will begin.
+        </p>
+        <p>
+            4. Make sure that any physical pages you intend to use for writing are visible on camera. Do not navigate back or refresh the test page, as doing so may result in forfeiting the exam.
+        </p>
+        <p>
+            5. Scroll through the exam pages to view the questions. The interface will automatically adjust the zoom, so please maintain your device in landscape mode throughout the test. Refrain from pressing unnecessary buttons or taking screenshots during the exam.
+        </p>
+        <p>
+            6. If you finish the exam before the allotted time, click the submit button, confirm submission, and then exit the platform. Any error messages following submission can be disregarded.
+        </p>
+        <p>
+            7. In case of uncertainty during the exam, note that the test will automatically submit after two hours. After submission, you will be redirected to the answer page where you should download (by clicking a square button on top left) and review your answers, make any necessary corrections, and then share the answer page along with all related pages via WhatsApp.
+        </p>
+        <p>
+            Failure to adhere to these instructions may prevent access to the answer page, thereby hindering your ability to review your responses.
+        </p>
+        <p><strong>All the best and happy learning!</strong></p>
+    </div>
+    
+    <p id="timer"></p>
+    <button id="startBtn" disabled>Start Test</button>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Answers</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f5f5f5; padding: 20px; }
+        h1 { color: #333; }
+        p { font-size: 18px; }
+        iframe { width: 90%; height: 600px; border: 1px solid black; margin-top: 20px; }
+        .thank-you { font-size: 22px; font-weight: bold; color: green; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Thank You for Completing the Test!</h1>
+    <p class="thank-you">Your responses have been recorded.</p>
+    <p>You can now review the answers below:</p>
+
+    <!-- ✅ Directly Open the PDF in Google Drive Viewer -->
+    <iframe src="{{ pdf_link }}" allowfullscreen></iframe>  <!-- ✅ Uses correct Google Drive embed link -->
+
+</body>
+</html>

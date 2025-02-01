@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Page</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        /* Centering Content */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            background: #f4f4f9;
+        }
+
+        #timer {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        #progressBar {
+            width: 100%;
+            height: 10px;
+            background: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        #progress {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #4caf50, #ff9800);
+            transition: width 1s linear;
+        }
+
+        /* PDF Container */
+        #pdfContainer {
+            display: none;
+            margin: 20px auto;
+            max-width: 90%;
+        }
+
+        #pdfViewer {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+
+        /* Centering Buttons */
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        /* Button Styling */
+        button {
+            padding: 12px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            margin: 10px;
+            transition: 0.3s;
+            width: 200px;
+            text-align: center;
+        }
+
+        /* Start Button */
+        #startBtn {
+            background: #28a745;
+            color: white;
+            font-weight: bold;
+        }
+
+        #startBtn:hover {
+            background: #218838;
+        }
+
+        /* Submit Button */
+        #submitBtn {
+            display: none;
+            background: #dc3545;
+            color: white;
+            font-weight: bold;
+        }
+
+        #submitBtn:hover {
+            background: #c82333;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            #timer {
+                font-size: 20px;
+                padding: 8px;
+            }
+
+            button {
+                width: 90%;
+                max-width: 300px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Display a countdown timer -->
+    <div id="timer">Time remaining: <span id="time"></span></div>
+    <div id="progressBar">
+        <div id="progress"></div>
+    </div>
+
+    <!-- Initially hidden PDF container -->
+    <div id="pdfContainer">
+        <iframe id="pdfViewer" width="100%" height="600px" src="{{ pdf_link }}" frameborder="0"></iframe>
+    </div>
+
+    <button id="startBtn" onclick="startTest()">Start Test</button>
+    <button id="submitBtn" onclick="submitTest()">Submit Test</button>
+
+    <script>
+        let testStarted = false;
+        let testId = "{{ test_id }}";
+
+        // "duration" is passed to the template in seconds
+        const duration = {{ duration }} * 1000;
+
+        let timer;
+        let screenRecorder, cameraRecorder;
+        let screenChunks = [];
+        let cameraChunks = [];
+
+        //----------------------------------------------------------
+        // Request both camera & screen permissions before starting
+        //----------------------------------------------------------
+        async function requestPermissions() {
+            try {
+                await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+                if (navigator.mediaDevices.getDisplayMedia) {
+                    try {
+                        await navigator.mediaDevices.getDisplayMedia({ video: true });
+                        return { cameraAudio: true, screenCapture: true };
+                    } catch (screenError) {
+                        console.warn("Screen capture not available:", screenError);
+                        return { cameraAudio: true, screenCapture: false };
+                    }
+                } else {
+                    console.warn("Screen capture not supported on this device");
+                    return { cameraAudio: true, screenCapture: false };
+                }
+            } catch (error) {
+                console.error("Permission denied:", error);
+                return { cameraAudio: false, screenCapture: false };
+            }
+        }
+
+        //----------------------------------------------------------
+        // Start the test (recordings + UI changes)
+        //----------------------------------------------------------
+        async function startTest() {
+            if (testStarted) return;
+
+            const permissionsGranted = await requestPermissions();
+            if (!permissionsGranted) {
+                alert("All permissions are required to start the test.");
+                return;
+            }
+
+            testStarted = true;
+            document.getElementById("startBtn").style.display = "none";
+            document.getElementById("submitBtn").style.display = "inline";
+            document.getElementById("pdfContainer").style.display = "block";
+
+            startRecording(permissionsGranted.screenCapture);
+            startTimer();
+            setupTabChangeWarning();
+            startPeriodicSnapshots();
+        }
+
+        //----------------------------------------------------------
+        // Start screen + camera recordings using MediaRecorder
+        //----------------------------------------------------------
+        async function startRecording(screenCaptureEnabled) {
+            try {
+                const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                cameraRecorder = new MediaRecorder(cameraStream);
+                cameraRecorder.ondataavailable = e => cameraChunks.push(e.data);
+                cameraRecorder.start();
+            } catch (cameraError) {
+                console.error("Failed to start camera/audio recording:", cameraError);
+                alert("Camera and audio permissions are required to start the exam.");
+                throw new Error("Camera access denied. Exam cannot proceed.");
+            }
+
+            if (screenCaptureEnabled) {
+                try {
+                    const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                    screenRecorder = new MediaRecorder(screenStream);
+                    screenRecorder.ondataavailable = e => screenChunks.push(e.data);
+                    screenRecorder.start();
+                } catch (screenError) {
+                    console.warn("Screen recording failed:", screenError);
+                    alert("Screen recording failed. The exam will continue without it.");
+                }
+            }
+        }
+
+        function startTimer() {
+            let timeLeft = duration / 1000; // Convert milliseconds to seconds
+            let progressBar = document.getElementById("progress");
+        
+            timer = setInterval(() => {
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = Math.floor(timeLeft % 60);
+        
+                document.getElementById("time").textContent =
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+                // 🔥 Update progress bar width dynamically
+                let percentage = (timeLeft / (duration / 1000)) * 100;
+                progressBar.style.width = percentage + "%";
+        
+                if (--timeLeft < 0) {
+                    clearInterval(timer);
+                    submitTest();
+                }
+            }, 1000);
+        }
+        
+
+        //----------------------------------------------------------
+        // Stop recordings and submit final data
+        //----------------------------------------------------------
+        function submitTest() {
+            stopRecording();
+            clearInterval(timer);
+
+            const formData = new FormData();
+
+            if (screenChunks.length > 0) {
+                const screenBlob = new Blob(screenChunks, { type: "video/webm" });
+                formData.append("screen_recording", screenBlob, "screen_recording.webm");
+            }
+
+            if (cameraChunks.length > 0) {
+                const cameraBlob = new Blob(cameraChunks, { type: "video/webm" });
+                formData.append("camera_recording", cameraBlob, "camera_recording.webm");
+            }
+
+            $.ajax({
+                url: `/submit_test/${testId}`,
+                method: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: () => {
+                    alert("Test submitted successfully!");
+                    window.location.href = `/answers/${testId}`;
+                },
+                error: () => {
+                    alert("Error submitting test. Please try again.");
+                }
+            });
+        }
+
+        function stopRecording() {
+            if (screenRecorder && screenRecorder.state !== "inactive") screenRecorder.stop();
+            if (cameraRecorder && cameraRecorder.state !== "inactive") cameraRecorder.stop();
+        }
+        //----------------------------------------------------------
+        // Warn user before leaving if test is started
+        //----------------------------------------------------------
+        window.onbeforeunload = (e) => {
+            if (testStarted) {
+                e.preventDefault();
+                e.returnValue = "Are you sure you want to leave?";
+    }
+};
+    </script>
+</body>
+
+</html>
